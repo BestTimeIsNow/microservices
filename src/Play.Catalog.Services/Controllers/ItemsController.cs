@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Play.Catalog.Services.Dtos;
+using Play.Catalog.Services.Repositories;
+using Play.Catalog.Services.Extensions;
+using Play.Catalog.Services.Entities;
 
 namespace Play.Catalog.Services
 {
@@ -10,6 +14,8 @@ namespace Play.Catalog.Services
     [Route("items")]
     public class ItemsController : ControllerBase
     {
+
+        private readonly ItemsRepository itemsRepository = new();
         public static readonly List<ItemDto> items = new List<ItemDto>
         {
             new ItemDto(Guid.NewGuid(), "Potion", "Heal some HP", 5, DateTimeOffset.UtcNow),
@@ -18,70 +24,96 @@ namespace Play.Catalog.Services
         };
 
         [HttpGet]
-        public ActionResult<IEnumerable<ItemDto>> GetItems()
+        public async Task<ActionResult<IEnumerable<ItemDto>>> GetItems()
         {
-            return items;
+            var result = await itemsRepository.GetItemsAsync();
+            return Ok(result.Select(item => item.AsDto()));
         }
 
         [HttpGet("{id}")]
-        public ActionResult<ItemDto> GetItem(Guid id)
+        public async Task<ActionResult<ItemDto>> GetItem(Guid id)
         {
-            var item = items.Where(items => items.Id == id).FirstOrDefault();
+            var result = await itemsRepository.GetItemAsync(id);
 
-            if(item == null){
-                return NotFound();
-            }
+            if(result == null) return NotFound();
 
-            return NoContent();
+            return Ok(result.AsDto());
+
         }
 
+        // If successful, return 201 (resource created) & ItemDto
         [HttpPost]
-        public ActionResult<ItemDto> CreateItem(AddItemDto addItem)
+        public async Task<ActionResult<ItemDto>> CreateItem(AddItemDto addItem)
         {
-            var newItem = new ItemDto(Guid.NewGuid(), addItem.name, addItem.description, addItem.price, DateTimeOffset.UtcNow);
-            items.Add(newItem);
+            // create Item Entity from AddItemDto and invoke AddItemAsync(Item)
+            // then "CreateAtAction..." with Item.AsDto()
 
-            return CreatedAtAction(nameof(GetItem), new {id = newItem.Id}, newItem);
+            var item = new Item
+            {
+                Id = Guid.NewGuid(),
+                Name = addItem.name,
+                Description = addItem.description,
+                Price = addItem.price,
+                CreatedDtTm = DateTimeOffset.UtcNow
+            };
+
+            var result = false;
+
+            result = await itemsRepository.AddItemAsync(item);
+
+            if (result)
+            {
+                // Note: At runtime, aspnetcore remove "async" from nameof, so either keep name less 'async'
+                //       or in startup services, add option to controllers to suppress this behavior
+                return CreatedAtAction(nameof(GetItem), new {id = item.Id}, item.AsDto());
+            }
+            
+            return BadRequest("There was a problem with adding the item.  Please review and try again.");
+
         }
 
 
         [HttpPut("{id}")]
-        public ActionResult UpdateItem(Guid id, UpdateItemDto updateItemDto)
+        public async Task<ActionResult> UpdateItem(Guid id, UpdateItemDto updateItemDto)
         {
-            var item = items.Where(item => item.Id == id).SingleOrDefault();
+            // Retrieve item, esp for the CreatedDtTm
+            // Create Item Entity
+            // Invoke UpdateItemAsync(Item) & return based on result
 
-            if(item == null){
-                return NotFound();
+            var item = await itemsRepository.GetItemAsync(id);
+
+            var itemEntity = new Item
+            {
+                Id = id,
+                Name = updateItemDto.name,
+                Description = updateItemDto.description,
+                Price = updateItemDto.price,
+                CreatedDtTm = item.CreatedDtTm
+            };
+
+            var success = await itemsRepository.UpdateItemAsync(itemEntity);
+
+            if (success)
+            {
+                return NoContent();
             }
-            
-            var index = items.IndexOf(item);
+            else
+            {
+                return BadRequest("There was a problem with updating the item. Please review and try again.");
+            }
 
-            var updatedItem = new ItemDto(item.Id, updateItemDto.name, updateItemDto.description, updateItemDto.price, item.CreateDtTm);
-
-            items[index] = updatedItem;
-
-            return NoContent();
         }
 
         [HttpDelete("{id}")]
-        public ActionResult DeleteItem(Guid id)
+        public async Task<ActionResult> DeleteItem(Guid id)
         {
-            // Option 1 works:
-            // var item = items.Where(item => item.Id == id).SingleOrDefault();
-            // items.Remove(item);
+            // Invoke DeleteItemAsync(id) & return based on result
+            var success = await itemsRepository.DeleteItemAsync(id);
 
-            // Option 2:
-            var index = items.FindIndex(item => item.Id == id);
+            if (success) return NoContent();
 
-            // If index is not found, "FindIndex" returns -1
-            if(index < 0){
-                return NotFound();
-            };
-
-            items.RemoveAt(index);
-
-            return NoContent();
-        }
+            return BadRequest("There was a problem deleting this item. Plesae review and try again.");
+        }   
 
 
     }
