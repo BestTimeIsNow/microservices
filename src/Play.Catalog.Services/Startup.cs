@@ -14,6 +14,8 @@ using Microsoft.OpenApi.Models;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
+using Play.Catalog.Services.Data;
+using Play.Catalog.Services.Repositories;
 
 namespace Play.Catalog.Services
 {
@@ -37,6 +39,7 @@ namespace Play.Catalog.Services
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Play.Catalog.Services", Version = "v1" });
             });
+            services.AddScoped<I_ItemsRepository, ItemsRepository>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

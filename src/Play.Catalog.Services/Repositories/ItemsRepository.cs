@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using MongoDB.Driver;
+using Play.Catalog.Services.Data;
 using Play.Catalog.Services.Dtos;
 using Play.Catalog.Services.Entities;
 
 namespace Play.Catalog.Services.Repositories
 {
-    public class ItemsRepository
+    public class ItemsRepository : I_ItemsRepository
     {
         // 3 private fields for coll name, coll, filter
         // constructor db location, connection, and collection
